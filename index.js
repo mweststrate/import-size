@@ -1,5 +1,6 @@
 const path = require("path");
 const arg = require("arg");
+const fs = require("fs")
 
 const { importCost, cleanup, JAVASCRIPT } = require("import-cost");
 
@@ -23,7 +24,7 @@ function generateImports(library, methods) {
   if (namedImports.length > 0) {
     res += `import {${namedImports.join(",")}} from '${library}';`
   }
-  console.log(res)
+  // console.log(res)
   return res;
 }
 
@@ -66,6 +67,36 @@ async function analyze(dir, library, methods) {
   return p;
 }
 
+function determineImportName(lib) {
+  let targetPath = '';
+  if (lib === '.') {
+    targetPath = process.cwd()
+  } else if (lib.startsWith('/')) {
+    targetPath = lib
+  } else if (lib.startsWith('.')) {
+    targetPath = path.resolve(process.cwd(), lib)
+  } else {
+    // not a file path but imported module
+    return [lib, []];
+  }
+  if (!fs.existsSync(path.join(targetPath, "package.json"))) {
+    throw new Error("Failed to find a package at " + targetPath)
+  }
+  const toRemove = []
+  const modulesDir  = path.join(process.cwd(), "node_modules")
+  if (!fs.existsSync(modulesDir)) {
+    fs.mkdirSync(modulesDir)
+    toRemove.push(modulesDir);
+  }
+  const linkLok = path.join(modulesDir, "__importsizelink__")
+  if (fs.existsSync(linkLok)) {
+    fs.unlinkSync(linkLok)
+  }
+  fs.symlinkSync(targetPath, linkLok)
+  toRemove.unshift(linkLok)
+  return ["__importsizelink__", toRemove];
+}
+
 function main() {
   const args = arg({
     "--help": Boolean,
@@ -89,13 +120,19 @@ function main() {
   }
 
   const [library, ...methods] = args._;
-  analyze(process.cwd(), library, methods).then(
+  const [importName, toRemove] = determineImportName(library)
+
+  analyze(process.cwd(), importName, methods).then(
     () => {
       process.exit(0);
     },
     e => {
       console.error(e);
       process.exit(1);
+    }
+  ).finally(
+    function cleanFiles() {
+      toRemove.forEach(f => fs.unlinkSync(f))
     }
   );
 }
