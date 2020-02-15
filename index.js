@@ -1,6 +1,5 @@
 const path = require("path");
-const arg = require("arg");
-const fs = require("fs")
+const fs = require("fs");
 
 const { importCost, cleanup, JAVASCRIPT } = require("import-cost");
 
@@ -8,28 +7,27 @@ let verbose = false;
 
 function generateImports(library, methods) {
   if (methods.length === 0) {
-    return `import "${library}";`
+    return `import "${library}";`;
   }
   if (methods.indexOf("*") !== -1) {
-    return `import * as _everything_ from "${library}";`
+    return `import * as _everything_ from "${library}";`;
   }
-  const hasDefault = methods.indexOf("default") !== -1
+  const hasDefault = methods.indexOf("default") !== -1;
   const namedImports = methods.filter(m => m !== "*" && m !== "default");
-  let res = `import `
+  let res = `import `;
   if (hasDefault) {
-    res += `_default_`
-    if (namedImports.length)
-      res += `,`
+    res += `_default_`;
+    if (namedImports.length) res += `,`;
   }
   namedImports.forEach(i => {
     if (!/^[\w_$][\w\d_$]*?$/.test(i)) {
-      throw new Error(`Invalid import: '${i}'`)
+      throw new Error(`Invalid import: '${i}'`);
     }
-  })
+  });
   if (namedImports.length > 0) {
-    res += ` {${namedImports.join(",")}} `
+    res += ` {${namedImports.join(",")}} `;
   }
-  res += `from '${library}';`
+  res += `from '${library}';`;
   if (verbose) {
     console.log("Analyzing: " + res);
   }
@@ -76,82 +74,74 @@ async function analyze(dir, library, methods) {
 }
 
 function determineImportName(lib) {
-  let targetPath = '';
-  if (lib === '.') {
-    targetPath = process.cwd()
-  } else if (lib.startsWith('/')) {
-    targetPath = lib
-  } else if (lib.startsWith('.')) {
-    targetPath = path.resolve(process.cwd(), lib)
+  let targetPath = "";
+  if (lib === ".") {
+    targetPath = process.cwd();
+  } else if (lib.startsWith("/")) {
+    targetPath = lib;
+  } else if (lib.startsWith(".")) {
+    targetPath = path.resolve(process.cwd(), lib);
   } else {
     // not a file path but imported module
     return [lib, []];
   }
   if (!fs.existsSync(path.join(targetPath, "package.json"))) {
-    throw new Error("Failed to find a package at " + targetPath)
+    throw new Error("Failed to find a package at " + targetPath);
   }
-  const toRemove = []
-  const modulesDir  = path.join(process.cwd(), "node_modules")
+  const toRemove = [];
+  const modulesDir = path.join(process.cwd(), "node_modules");
   if (!fs.existsSync(modulesDir)) {
-    fs.mkdirSync(modulesDir)
+    fs.mkdirSync(modulesDir);
     toRemove.push(modulesDir);
   }
-  const linkLok = path.join(modulesDir, "__importsizelink__")
+  const linkLok = path.join(modulesDir, "__importsizelink__");
   if (fs.existsSync(linkLok)) {
-    fs.unlinkSync(linkLok)
+    fs.unlinkSync(linkLok);
   }
   if (verbose) {
-    console.log(`linking ${linkLok} to ${targetPath}`)
+    console.log(`linking ${linkLok} to ${targetPath}`);
   }
-  fs.symlinkSync(targetPath, linkLok)
-  toRemove.unshift(linkLok)
+  fs.symlinkSync(targetPath, linkLok);
+  toRemove.unshift(linkLok);
   return ["__importsizelink__", toRemove];
 }
 
 function main() {
-  const args = arg({
-    "--help": Boolean,
-    "--version": Boolean,
-    "--verbose": Boolean
-  });
+  const program = require("commander")
+    .name(require("./package.json").name)
+    .version(require("./package.json").version)
+    .usage("[options] library [...imports]")
+    .description(
+      `Computes the production build, tree-shaken costs of your imports.\nFor example, to compute the build size impact if you import only 'observable' and 'autorun' from 'mobx':\n\n      import-size mobx autorun observable\n\n. Or, to compute the size of everything:\n\n      import-size mobx '*'`
+    )
+    .option("--verbose", "show some debug output", false)
+    .parse(process.argv);
 
-  if (args["--version"]) {
-    console.log(require("./package.json").version);
-    process.exit(0);
-  }
-  if (args["--help"]) {
-    console.log(
-      "Usage: import-size [library] [...methods]\nExample: import-size mobx autorun observable"
-    );
-    process.exit(0);
-  }
-
-  if (args._.length < 1) {
-    console.error("requires at least one argument");
+  if (program.args.length < 1) {
+    program.outputHelp();
     process.exit(1);
   }
-  if (args['--verbose']) {
-    verbose = true;
-  }
 
-  const [library, ...methods] = args._;
-  const [importName, toRemove] = determineImportName(library)
-  
+  verbose = program.verbose;
+
+  const [library, ...methods] = program.args;
+  const [importName, toRemove] = determineImportName(library);
+
   function cleanFiles() {
-    toRemove.forEach(f => fs.unlinkSync(f))
+    toRemove.forEach(f => fs.unlinkSync(f));
   }
 
   analyze(process.cwd(), importName, methods).then(
     () => {
-      cleanFiles()
+      cleanFiles();
       process.exit(0);
     },
     e => {
       console.error(e);
-      cleanFiles()
+      cleanFiles();
       process.exit(1);
     }
-  )
+  );
 }
 
 main();
