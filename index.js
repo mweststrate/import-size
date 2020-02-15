@@ -4,27 +4,35 @@ const fs = require("fs")
 
 const { importCost, cleanup, JAVASCRIPT } = require("import-cost");
 
+let verbose = false;
+
 function generateImports(library, methods) {
-  let res = '';
   if (methods.length === 0) {
-    res += `import "${library}";`
+    return `import "${library}";`
   }
   if (methods.indexOf("*") !== -1) {
-    res += `import * as _everything_ from "${library}";`
+    return `import * as _everything_ from "${library}";`
   }
-  if (methods.indexOf("default") !== -1) {
-    res += `import _default_ from "${library}";`
-  }
+  const hasDefault = methods.indexOf("default") !== -1
   const namedImports = methods.filter(m => m !== "*" && m !== "default");
+  let res = `import `
+  if (hasDefault) {
+    res += `_default_`
+    if (namedImports.length)
+      res += `,`
+  }
   namedImports.forEach(i => {
     if (!/^[\w_$][\w\d_$]*?$/.test(i)) {
       throw new Error(`Invalid import: '${i}'`)
     }
   })
   if (namedImports.length > 0) {
-    res += `import {${namedImports.join(",")}} from '${library}';`
+    res += ` {${namedImports.join(",")}} `
   }
-  // console.log(res)
+  res += `from '${library}';`
+  if (verbose) {
+    console.log("Analyzing: " + res);
+  }
   return res;
 }
 
@@ -92,6 +100,9 @@ function determineImportName(lib) {
   if (fs.existsSync(linkLok)) {
     fs.unlinkSync(linkLok)
   }
+  if (verbose) {
+    console.log(`linking ${linkLok} to ${targetPath}`)
+  }
   fs.symlinkSync(targetPath, linkLok)
   toRemove.unshift(linkLok)
   return ["__importsizelink__", toRemove];
@@ -100,7 +111,8 @@ function determineImportName(lib) {
 function main() {
   const args = arg({
     "--help": Boolean,
-    "--version": Boolean
+    "--version": Boolean,
+    "--verbose": Boolean
   });
 
   if (args["--version"]) {
@@ -118,23 +130,28 @@ function main() {
     console.error("requires at least one argument");
     process.exit(1);
   }
+  if (args['--verbose']) {
+    verbose = true;
+  }
 
   const [library, ...methods] = args._;
   const [importName, toRemove] = determineImportName(library)
+  
+  function cleanFiles() {
+    toRemove.forEach(f => fs.unlinkSync(f))
+  }
 
   analyze(process.cwd(), importName, methods).then(
     () => {
+      cleanFiles()
       process.exit(0);
     },
     e => {
       console.error(e);
+      cleanFiles()
       process.exit(1);
     }
-  ).finally(
-    function cleanFiles() {
-      toRemove.forEach(f => fs.unlinkSync(f))
-    }
-  );
+  )
 }
 
 main();
