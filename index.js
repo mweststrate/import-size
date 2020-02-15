@@ -3,6 +3,30 @@ const arg = require("arg");
 
 const { importCost, cleanup, JAVASCRIPT } = require("import-cost");
 
+function generateImports(library, methods) {
+  let res = '';
+  if (methods.length === 0) {
+    res += `import "${library}";`
+  }
+  if (methods.indexOf("*") !== -1) {
+    res += `import * as _everything_ from "${library}";`
+  }
+  if (methods.indexOf("default") !== -1) {
+    res += `import _default_ from "${library}";`
+  }
+  const namedImports = methods.filter(m => m !== "*" && m !== "default");
+  namedImports.forEach(i => {
+    if (!/^[\w_$][\w\d_$]*?$/.test(i)) {
+      throw new Error(`Invalid import: '${i}'`)
+    }
+  })
+  if (namedImports.length > 0) {
+    res += `import {${namedImports.join(",")}} from '${library}';`
+  }
+  console.log(res)
+  return res;
+}
+
 async function analyze(dir, library, methods) {
   let resolve, reject;
 
@@ -14,8 +38,7 @@ async function analyze(dir, library, methods) {
   const target = path.join(dir, "import-size.js");
   const emitter = importCost(
     target,
-    // TODO: what about default, *, nothing?
-    `import {${methods.join(",")}} from '${library}'`,
+    generateImports(library, methods),
     JAVASCRIPT
   );
 
@@ -60,8 +83,8 @@ function main() {
     process.exit(0);
   }
 
-  if (args._.length < 2) {
-    console.error("requires at least two arguments");
+  if (args._.length < 1) {
+    console.error("requires at least one argument");
     process.exit(1);
   }
 
