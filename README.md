@@ -36,7 +36,7 @@ Using only `autorun`, `observable`, `computed` and `action` from "MobX" will res
 
 
 ```bash
-$ npx mobx '*'
+$ npx import-size mobx '*'
 15850
 ```
 Importing the full MobX api will take 2KB more (so clearly it is not super good at tree-shaking (yet!))
