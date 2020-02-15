@@ -1,12 +1,15 @@
 {
   "name": "import-size",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Measure the real, minified, tree-shaken impact of individual imports into your app",
   "main": "index.js",
   "bin": "./index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "files": [
+    "index.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mweststrate/import-size.git"
