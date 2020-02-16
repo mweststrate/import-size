@@ -37,8 +37,9 @@ function generateImports(library, methods) {
 }
 
 async function analyze(dir, library, methods) {
+  // or, run: "yarn webpack --mode production -p --display-optimizatin-bailout --entry ./test.js --context `pwd` && stat -f\"%z\" dist/null.js"
   return new Promise((resolve, reject) => {
-    const target = path.join(dir, "import-size.js");
+    const target = path.join(dir, `import-size.js`);
     const emitter = importCost(
       target,
       generateImports(library, methods),
@@ -89,7 +90,8 @@ function determineImportName(lib) {
     fs.mkdirSync(modulesDir);
     toRemove.push(modulesDir);
   }
-  const linkLok = path.join(modulesDir, "__importsizelink__");
+  const linkname = `__importsizelink${Math.random()}__`
+  const linkLok = path.join(modulesDir, linkname);
   if (fs.existsSync(linkLok)) {
     fs.unlinkSync(linkLok);
   }
@@ -98,7 +100,7 @@ function determineImportName(lib) {
   }
   fs.symlinkSync(targetPath, linkLok);
   toRemove.unshift(linkLok);
-  return ["__importsizelink__", toRemove, realname];
+  return [linkname, toRemove, realname];
 }
 
 function main() {

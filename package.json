@@ -1,6 +1,6 @@
 {
   "name": "import-size",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Measure the real, minified, tree-shaken impact of individual imports into your app",
   "main": "index.js",
   "bin": "./index.js",
